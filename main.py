@@ -1,4 +1,6 @@
-#
+# python3
+
+## Libraries
 import sys, threading
 import random
 import utils
@@ -6,6 +8,8 @@ import utils
 sys.setrecursionlimit(10**7)
 threading.stack_size(2**27)
 
+
+## Supporting Mathematical Functions
 def ConvertToInt(message_str):
   res = 0
   for i in range(len(message_str)):
@@ -32,7 +36,6 @@ def PowMod(a, n, mod):
         else:
           return b * a % mod
 
-
 def ExtendedEuclid(a, b):
     if b == 0:
         return (1, 0)
@@ -51,15 +54,27 @@ def GCD(a, b):
     return a
   return GCD(b, a % b)
 
+def IntSqrt(n):
+  low = 1
+  high = n
+  iterations = 0
+  while low < high and iterations < 5000:
+    iterations += 1
+    mid = (low + high + 1) // 2
+    if mid * mid <= n:
+      low = mid
+    else:
+      high = mid - 1
+  return low
 
-def Decrypt(ciphertext, p, q, exponent):
-  d=InvertModulo(exponent,(p-1)*(q-1))
-  return ConvertToStr(PowMod(ciphertext, d, p * q))
+def ChineseRemainderTheorem(n1, r1, n2, r2):
+  (x, y) = ExtendedEuclid(n1, n2)
+  return ((r2 * x * n1 + r1 * y * n2) % (n1 * n2) + (n1 * n2)) % (n1 * n2)
 
-def Encrypt(message, modulo, exponent):
-  return PowMod(ConvertToInt(message), exponent, modulo)
+## Functions To Generate Large Primes
 
 def isLowPrime(num):
+  """Performs Lower Prime Test On Numbers"""
   lowPrimes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 
    67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 
    157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 
@@ -76,6 +91,7 @@ def isLowPrime(num):
   else: return True
   
 def MillerRabin(num):
+  """Performs Miller Rabin Test On Possible Prime Numbers"""
   t=num-1
   divby2=0
   while t%2 == 0:
@@ -97,6 +113,7 @@ def MillerRabin(num):
     return False
    
 def generateLargePrime(n):
+  """Generates Large Prime Numbers"""
   while True:
     num=random.randrange(2**(n-1)+1, 2**n - 1)
     if isLowPrime(num) and MillerRabin(num):
@@ -105,79 +122,84 @@ def generateLargePrime(n):
     else:
       continue
 
-def generateKeys(keySize = 1024):
+## Function For Encryption And Decryption
+
+
+def Decrypt(ciphertext, p, q, exponent):
+  """Decrypt Message Using Private Key"""
+  d=InvertModulo(exponent,(p-1)*(q-1))
+  return ConvertToStr(PowMod(ciphertext, d, p * q))
+
+def Encrypt(message, modulo, exponent):
+  """Encrypt Message Using Public Key"""
+  return PowMod(ConvertToInt(message), exponent, modulo)
+      
+      
+      
+## Function To Generate Keys
+
+def generateKeys(keySize = 1024 , writeToFile = False):
+  """Generates Public And Private Keys For Encryption And Decryption. Set writeToFile Parameter To True, To Write The Keys To Respective Files."""
   p=generateLargePrime(keySize)
   q=generateLargePrime(keySize)
-  
+  n=p*q
+  while True:
+    expo = random.randrange(2 ** (keySize - 1), 2 ** (keySize))
+    if GCD(expo, (p - 1) * (q - 1)) == 1:
+      break
+  if writeToFile:
+    file = open("privateKey", 'w')
+    file.write("Private Key \np=%s \nq=%s\ne=%s\n" % (p,q,expo))
+    file.close()
+    file = open("publicKey", 'w')
+    file.write("Public Key \nn=%s\ne=%s\n" % (n,expo))
+    file.close()
+  else:
+    print("Public Key ")
+    print("n =",n)
+    print("e =",expo)
+    print()
+    print("Private Key ")
+    print("p =",p)
+    print("q =",q)
+    print("e =",expo)
 
 
+## Functions To Decode Weak Keys
 
+def DecipherPotential(ciphertext, modulo, exponent, potential_messages):
+  """If You Know List Of Potential Messages"""
+  for message in potential_messages:
+    if ciphertext == Encrypt(message, modulo, exponent):
+      return message
+  return "Encrypted Message not among potential messages"
 
-
-
-
-#1 potential message
-def DecipherSimple(ciphertext, modulo, exponent, potential_messages):
-      if ciphertext == Encrypt(potential_messages[0], modulo, exponent):
-        return potential_messages[0]
-      elif ciphertext == Encrypt(potential_messages[1], modulo, exponent):
-        return potential_messages[1]
-      elif ciphertext == Encrypt(potential_messages[2], modulo, exponent):
-        return potential_messages[2]    
-      return "don't know"
-
-#2 p or q less than 1,000,000
-def DecipherSmallPrime(ciphertext, modulo, exponent):  
-      for x in range(2,1000000):
-        if modulo % x == 0:
-          small_prime = x
-          big_prime = modulo // x
-          return Decrypt(ciphertext, small_prime, big_prime, exponent)
-      return "don't know"
-
-#3 |p-q| < 5000
-def IntSqrt(n):
-  low = 1
-  high = n
-  iterations = 0
-  while low < high and iterations < 5000:
-    iterations += 1
-    mid = (low + high + 1) // 2
-    if mid * mid <= n:
-      low = mid
-    else:
-      high = mid - 1
-  return low
-
+def DecipherSmallPrime(ciphertext, modulo, exponent):
+  """Decodes Message If Any Prime Is Less Than 1,000,000"""
+  for x in range(2,1000000):
+    if modulo % x == 0:
+      small_prime = x
+      big_prime = modulo // x
+      return Decrypt(ciphertext, small_prime, big_prime, exponent)
+  return "Could Not Decrypt!!"
 
 def DecipherSmallDiff(ciphertext, modulo, exponent):
-  for x in range(IntSqrt(modulo)-5000,IntSqrt(modulo)+1):
+  """Decodes If Difference Between The Primes Is Less Than 10,000"""
+  for x in range(IntSqrt(modulo)-10000,IntSqrt(modulo)+1):
     if modulo % x ==0:
       small_prime = x
       big_prime = modulo // small_prime
       return Decrypt(ciphertext, small_prime, big_prime, exponent)
+  return "Could Not Decrypt!!"
 
-#4 2 cipher have one common divisor
 def DecipherCommonDivisor(first_ciphertext, first_modulo, first_exponent, second_ciphertext, second_modulo, second_exponent):
-  # Fix this implementation to correctly decipher both messages in case
-  # first_modulo and second_modulo share a prime factor, and return
-  # a pair (first_message, second_message). The implementation below won't work
-  # if the common_prime is bigger than 1000000.
+  """Decodes If We Have 2 Public Key With One Common Prime Among Them"""
   g= GCD(first_modulo,second_modulo)
   if g!=1:
     return (Decrypt(first_ciphertext, g, first_modulo//g, first_exponent), Decrypt(second_ciphertext, g, second_modulo//g, second_exponent))
-  return ("unknown message 1", "unknown message 2")
+  return ("Could Not Decrypt!!")
 
-#5 2 have same exponent
-
-def DecipherCommonDivisor(first_ciphertext, first_modulo, first_exponent, second_ciphertext, second_modulo, second_exponent):
-  # Fix this implementation to correctly decipher both messages in case
-  # first_modulo and second_modulo share a prime factor, and return
-  # a pair (first_message, second_message). The implementation below won't work
-  # if the common_prime is bigger than 1000000.
-  g= GCD(first_modulo,second_modulo)
-  if g!=1:
-    return (Decrypt(first_ciphertext, g, first_modulo//g, first_exponent), Decrypt(second_ciphertext, g, second_modulo//g, second_exponent))
-  return ("unknown message 1", "unknown message 2")
-
-#6 
+def DecipherHastad(first_ciphertext, first_modulo, second_ciphertext, second_modulo):
+  """Decodes If You Have Same Message Encrypted Using Same Exponent But Different Keys"""
+  r = ChineseRemainderTheorem(first_modulo, first_ciphertext, second_modulo, second_ciphertext)
+  return ConvertToStr(IntSqrt(r))
